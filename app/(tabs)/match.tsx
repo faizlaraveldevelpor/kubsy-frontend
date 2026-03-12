@@ -43,6 +43,8 @@ const FavoritesScreen = () => {
   const isPremium = profileSlice?.is_vip === true;
   const filterintrests = useSelector((state: any) => state?.profileSlice?.intrestesfilter);
   const filterage = useSelector((state: any) => state?.profileSlice?.agefilter);
+  const filterdistance = useSelector((state: any) => state?.profileSlice?.distancefilter);
+  const genderfilter = useSelector((state: any) => state?.profileSlice?.genderfilter);
   const allprofileSlice = useSelector((state: any) => state?.profileSlice?.allprofiles);
 
   const [matches, setMatches] = useState<any[]>([]);
@@ -70,14 +72,14 @@ const FavoritesScreen = () => {
     fetchProfiles(profileSlice.id, {
       minAge: filterage?.length > 0 ? filterage[0] : 18,
       maxAge: filterage?.length > 0 ? filterage[1] : 40,
-      maxDistance: 100,
-      genderFilter: profileSlice.gender,
+      maxDistance: filterdistance?.length > 0 ? filterdistance[1] : 100,
+      genderFilter: genderfilter && genderfilter.trim() !== '' ? genderfilter : undefined,
       professionFilter: [profileSlice.profession],
       userInterests: filterintrests?.length > 0 ? filterintrests : profileSlice.interests,
       userLat: profileSlice.latitude,
       userLon: profileSlice.longitude,
       cetagory: (profileSlice?.cetagory ?? profileSlice?.category)?.trim() || undefined,
-    })
+    }, 1)
       .then((res) => {
         const data = res?.data || [];
         const normalized = data.map((u: any) => ({
@@ -118,7 +120,7 @@ const FavoritesScreen = () => {
 
   useEffect(() => {
     fetchNewMatchProfiles();
-  }, [profileSlice?.id, filterintrests, filterage]);
+  }, [profileSlice?.id, filterintrests, filterage, filterdistance, genderfilter]);
 
   useEffect(() => {
     fetchYourMatches();
@@ -150,7 +152,7 @@ const FavoritesScreen = () => {
     <TouchableOpacity
       style={styles.newCard}
       activeOpacity={0.85}
-      onPress={() => router.push('userdetail')}
+      onPress={() => router.push({ pathname: '/userdetail', params: { id: String(item.id) } })}
     >
       <Image source={{ uri: item.avatar_url }} style={styles.newCardImage} />
       <LinearGradient
@@ -170,7 +172,7 @@ const FavoritesScreen = () => {
     <TouchableOpacity
       style={styles.yourCard}
       activeOpacity={0.85}
-      onPress={() => router.push('userdetail')}
+      onPress={() => router.push({ pathname: '/userdetail', params: { id: String(item.id) } })}
     >
       <Image source={{ uri: item.avatar_url }} style={styles.yourCardImage} />
       <LinearGradient

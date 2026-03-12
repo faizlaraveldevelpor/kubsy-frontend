@@ -13,7 +13,7 @@ export default function ReportDialog({ isVisible, onClose, reportedUserId, curre
   const handleReport = async () => {
     // Basic validation
     if (description.trim().length < 5) {
-      Alert.alert("Error", "Bara-e-meharbani wajah thori tafseel se likhein.");
+      Alert.alert("Error", "Please describe the reason in a bit more detail.");
       return;
     }
 
@@ -23,15 +23,15 @@ export default function ReportDialog({ isVisible, onClose, reportedUserId, curre
       const result = await submitReport(currentUserId, reportedUserId, description);
 
       if (result.success) {
-        Alert.alert("Shukriya", "Aapki report submit ho chuki hai. Admin jald iska jaiza lenge.");
+        Alert.alert("Thank you", "Your report has been submitted. An admin will review it shortly.");
         setDescription('');
         onClose();
       } else {
-        Alert.alert("Error", result.error || "Report submit nahi ho saki.");
+        Alert.alert("Error", result.error || "Report could not be submitted.");
       }
     } catch (error) {
       console.log("Report handle error:", error);
-      Alert.alert("Error", "Kuch ghalat hua. Dobara koshish karein.");
+      Alert.alert("Error", "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -52,12 +52,12 @@ export default function ReportDialog({ isVisible, onClose, reportedUserId, curre
           <View style={styles.dialogCard}>
             {/* Header */}
             <Text style={styles.title}>Report User</Text>
-            <Text style={styles.subtitle}>Wajah bayan karein taake admin check kar sakay.</Text>
+            <Text style={styles.subtitle}>Describe the reason so an admin can review it.</Text>
 
             {/* Input Field */}
             <TextInput
               style={styles.input}
-              placeholder="Masla likhein (e.g. Bad behavior, Spamming)..."
+              placeholder="Describe the issue (e.g. Bad behavior, Spamming)..."
               multiline
               numberOfLines={4}
               value={description}

@@ -41,7 +41,7 @@ const icebreakersState = [
 ];
 
 const SingleChat = () => {
-  const [ICEBREAKER_PROMPTS,seticebreakersState]=useState()
+  const [ICEBREAKER_PROMPTS, seticebreakersState] = useState<{ message?: string[] }[]>([])
   const safeTop = useSafeAreaTop();
   const profileSlice = useSelector((state: any) => state?.profileSlice?.userApi);
   const singlechatsSlice = useSelector((state: any) => state?.chats?.singleChatData);
@@ -270,7 +270,7 @@ const SingleChat = () => {
   }, [singlechatsSlice?.conversation_id]);
 
   const loadMoreMessages = async () => {
-    if (loadingMore || !hasMore || initialLoading) return;
+    if (loadingMore || !hasMore || initialLoading || !singlechatsSlice?.conversation_id) return;
     setLoadingMore(true);
     const nextPage = page + 1;
     const oldMsgs = await getMessages(singlechatsSlice.conversation_id, nextPage, PAGE_SIZE);
@@ -412,7 +412,7 @@ const SingleChat = () => {
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
           <Text style={styles.userName} numberOfLines={1}>{singlechatsSlice?.other_user?.full_name || 'Chat'}</Text>
-          <Text style={[styles.statusText, { color: isOnline ? '#4CAF50' : '#999' }]}>{isOnline ? 'Online' : 'Offline'}</Text>
+          {/* <Text style={[styles.statusText, { color: isOnline ? '#4CAF50' : '#999' }]}>{isOnline ? 'Online' : 'Offline'}</Text> */}
         </View>
         <View style={{ flexDirection: 'row', gap: 15 }}>
           {/* Report Icon Added */}
@@ -457,7 +457,7 @@ const SingleChat = () => {
           <Text style={styles.icebreakerHeader}>Spark a conversation:</Text>
           <FlatList
             horizontal
-            data={ICEBREAKER_PROMPTS[0]?.message}
+            data={Array.isArray(ICEBREAKER_PROMPTS?.[0]?.message) ? ICEBREAKER_PROMPTS[0].message : icebreakersState}
             keyExtractor={(item, index) => index.toString()}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: 15 }}

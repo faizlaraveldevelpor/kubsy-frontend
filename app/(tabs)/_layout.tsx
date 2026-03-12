@@ -63,6 +63,10 @@ export default function TabLayout() {
       try {
         const data = await getMyProfile();
         if (data?.data) {
+          if (userProfile?.is_vip === true && data.data?.is_vip !== true) {
+            fetchAndSetUnreadCount(data.data.id);
+            return;
+          }
           dispatch(GetprofileApi(data.data));
           fetchAndSetUnreadCount(data.data.id);
         }
@@ -71,7 +75,7 @@ export default function TabLayout() {
       }
     };
     initProfileAndData();
-  }, [dispatch, fetchAndSetUnreadCount]);
+  }, [dispatch, fetchAndSetUnreadCount, userProfile?.id]);
 
   useEffect(() => {
     if (!myId) return;

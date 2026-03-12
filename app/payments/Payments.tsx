@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaTop } from "@/hooks/useSafeAreaTop";
 import { Colors } from "@/theme/color";
 import { Fonts } from "@/theme/fonts";
@@ -18,6 +18,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { GetprofileApi } from "@/store/profileSlice";
 import { getMyProfile, updateProfile } from "@/services/Profile";
 import { getPaymentConfigFromApi } from "@/lib/paymentConfig";
+import { getSLERate } from "@/lib/openExchangeRates";
 import * as WebBrowser from "expo-web-browser";
 
 const API_URL = "https://vps.kubsy.app/api/v1";
@@ -26,6 +27,7 @@ type PaymentMethod = "stripe" | "monime";
 
 export default function Payment() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ planId?: string; amountCents?: string }>();
   const dispatch = useDispatch();
   const safeTop = useSafeAreaTop();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
@@ -33,6 +35,8 @@ export default function Payment() {
   const [stripeConfigured, setStripeConfigured] = useState(false);
   const [monimeEnabled, setMonimeEnabled] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>("stripe");
+
+  const amountCents = Math.max(1, parseInt(params.amountCents ?? "1999", 10) || 1999);
 
   const profileSlice = useSelector(
     (state: any) => state?.profileSlice?.userApi
@@ -54,7 +58,7 @@ export default function Payment() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: 2000,
+          amount: amountCents,
           userId: profileSlice?.id,
         }),
       });
@@ -146,11 +150,19 @@ export default function Payment() {
     const successRedirect = "kubsy://payment-success";
     try {
       setLoading(true);
+      const sleRate = await getSLERate();
+      if (!sleRate || sleRate <= 0) {
+        setLoading(false);
+        Alert.alert("Error", "Could not get exchange rate. Try again later.");
+        return;
+      }
+      const amountUsd = amountCents / 100;
+      const monimeAmount = Math.round(amountUsd * sleRate);
       const res = await fetch(`${API_URL}/create-monime-checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amount: 2000,
+          amount: monimeAmount,
           userId: profileSlice.id,
           successUrl: successRedirect,
           cancelUrl: successRedirect,

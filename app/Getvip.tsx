@@ -23,6 +23,7 @@ const PLANS = [
     price: '$9.99',
     period: '/month',
     perMonth: '$9.99',
+    amountCents: 999, // $9.99 for Stripe/backend (cents)
     badge: null,
     features: ['Unlimited Swipes', 'Unlimited Likes', 'No Ads'],
   },
@@ -32,6 +33,7 @@ const PLANS = [
     price: '$19.99',
     period: '/3 months',
     perMonth: '$6.66',
+    amountCents: 1999, // $19.99 for Stripe/backend (cents)
     badge: 'Most Popular',
     features: ['All Premium Features', 'Priority Support', 'Exclusive Badge'],
   },
@@ -148,7 +150,13 @@ export default function Getvip() {
         <TouchableOpacity
           activeOpacity={0.9}
           style={styles.ctaBtn}
-          onPress={() => router.push('/payments/Payments')}
+          onPress={() => {
+          const plan = PLANS.find((p) => p.id === selectedPlan);
+          router.push({
+            pathname: '/payments/Payments',
+            params: { planId: selectedPlan, amountCents: String(plan?.amountCents ?? 1999) },
+          });
+        }}
         >
           <LinearGradient
             colors={[Colors.primary, Colors.secondary]}

@@ -1,0 +1,36 @@
+# EAS Build: exclude from upload (like .gitignore)
+# Add paths you don't want sent to the build server
+
+# Native folders – EAS runs prebuild on server (saves ~2GB+ upload)
+android/
+ios/
+
+# Dependencies – EAS installs from package.json on server
+node_modules/
+
+# Docs and local setup
+docs/
+*.md
+!README.md
+
+# Env / secrets (never upload real secrets; use EAS Secrets)
+.env
+.env.*
+!.env.example
+
+# Firebase admin key (backend-only; never in app build)
+*-firebase-adminsdk-*.json
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Tests / e2e (smaller upload)
+__tests__/
+e2e/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx

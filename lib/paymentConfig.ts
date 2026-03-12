@@ -6,7 +6,11 @@ export const API_BASE = "https://vps.kubsy.app/api/v1";
 export type PaymentConfigResponse = {
   publishableKey: string | null;
   url: string | null;
+  /** Stripe configured (publishable key in DB) */
   configured: boolean;
+  /** Monime configured (monime_token + monime_space in DB) – same pattern as Stripe */
+  monimeEnabled?: boolean;
+  monimeWebhookUrl?: string | null;
 };
 
 export async function getPaymentConfigFromApi(): Promise<PaymentConfigResponse> {
@@ -17,6 +21,8 @@ export async function getPaymentConfigFromApi(): Promise<PaymentConfigResponse> 
       publishableKey: data.publishableKey ?? null,
       url: data.url ?? null,
       configured: !!data.configured,
+      monimeEnabled: !!data.monimeEnabled,
+      monimeWebhookUrl: data.monimeWebhookUrl ?? null,
     };
   } catch (e) {
     return { publishableKey: null, url: null, configured: false };

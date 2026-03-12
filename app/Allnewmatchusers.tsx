@@ -41,6 +41,8 @@ const NewMatchPage = () => {
   const profileSlice = useSelector((state: any) => state?.profileSlice?.userApi);
   const filterintrests = useSelector((state: any) => state?.profileSlice?.intrestesfilter);
   const filterage = useSelector((state: any) => state?.profileSlice?.agefilter);
+  const filterdistance = useSelector((state: any) => state?.profileSlice?.distancefilter);
+  const genderfilter = useSelector((state: any) => state?.profileSlice?.genderfilter);
 
   const [matches, setMatches] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -54,19 +56,21 @@ const NewMatchPage = () => {
     else setLoadingMore(true);
 
     try {
-      const res = await fetchProfiles(profileSlice.id, {
-        page: pageNum,
-        limit: 10,
-        minAge: filterage?.length > 0 ? filterage[0] : 18,
-        maxAge: filterage?.length > 0 ? filterage[1] : 40,
-        maxDistance: 100,
-        genderFilter: profileSlice.gender,
-        professionFilter: [profileSlice.profession],
-        userInterests: filterintrests?.length > 0 ? filterintrests : profileSlice.interests,
-        userLat: profileSlice.latitude,
-        userLon: profileSlice.longitude,
-        cetagory: (profileSlice?.cetagory ?? profileSlice?.category)?.trim() || undefined,
-      });
+      const res = await fetchProfiles(
+        profileSlice.id,
+        {
+          minAge: filterage?.length > 0 ? filterage[0] : 18,
+          maxAge: filterage?.length > 0 ? filterage[1] : 40,
+          maxDistance: filterdistance?.length > 0 ? filterdistance[1] : 100,
+          genderFilter: genderfilter && genderfilter.trim() !== '' ? genderfilter : undefined,
+          professionFilter: [profileSlice.profession],
+          userInterests: filterintrests?.length > 0 ? filterintrests : profileSlice.interests,
+          userLat: profileSlice.latitude,
+          userLon: profileSlice.longitude,
+          cetagory: (profileSlice?.cetagory ?? profileSlice?.category)?.trim() || undefined,
+        },
+        pageNum,
+      );
 
       const data = res?.data || [];
       const normalized = data.map((u: any) => ({
@@ -100,7 +104,7 @@ const NewMatchPage = () => {
     setPage(1);
     setHasMore(true);
     fetchData(1);
-  }, [profileSlice?.id, filterintrests, filterage]);
+  }, [profileSlice?.id, filterintrests, filterage, filterdistance, genderfilter]);
 
   const handleLoadMore = () => {
     if (!loadingMore && hasMore && !loading) {

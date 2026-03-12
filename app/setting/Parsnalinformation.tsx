@@ -25,6 +25,7 @@ const CATEGORY_OPTIONS = [
   "Hookups",
   "Open to anything",
   "Friends first",
+  "Serious relation"
 ];
 
 const Parsnalinformation = () => {

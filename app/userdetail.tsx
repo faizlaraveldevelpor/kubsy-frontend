@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,50 +7,72 @@ import {
   ScrollView,
   Dimensions,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/theme/color';
 import { Fonts } from '@/theme/fonts';
-import { useRouter } from 'expo-router';
-import { useSelector } from 'react-redux';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { getProfileById } from '@/services/Profile';
 
 const { height, width } = Dimensions.get('window');
 
-interface User {
-  images: any[];
-  name: string;
-  profession: string;
-  about: string;
-  interests: string[];
-}
-
-const user: User = {
-  images: [
-    require('../assets/images/user.jpg'),
-    require('../assets/images/user.jpg'),
-    require('../assets/images/user.jpg'),
-  ],
-  name: 'Sarah',
-  profession: 'Designer',
-  about:
-    'I love design, travel, and photography. Always curious to learn new things.',
-  interests: [
-    'Art',
-    'Travel',
-    'Photography',
-    'Music',
-    'Art',
-    'Travel',
-    'Photography',
-    'Music',
-  ],
-};
-
 const Loginuserdetails = () => {
   const router = useRouter();
+  const params = useLocalSearchParams<{ id?: string }>();
   const [activeIndex, setActiveIndex] = useState(0);
-  const profileSlice=useSelector((state)=>state?.profileSlice?.userApi)
-  console.log(profileSlice)
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const id = params?.id;
+    if (!id) {
+      setError('Profile not found');
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await getProfileById(id);
+        if (!cancelled) setProfile(data);
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message || 'Failed to load profile');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [params?.id]);
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
+  if (error || !profile) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <Text style={styles.errorText}>{error || 'Profile not found'}</Text>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <Ionicons name="chevron-back" size={26} color={Colors.white} />
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const images =
+    profile?.images?.length > 0
+      ? profile.images
+      : profile?.avatar_url
+        ? [profile.avatar_url]
+        : ['https://placehold.co/400x600?text=No+Photo'];
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* TOP IMAGE SLIDER */}
@@ -66,10 +88,10 @@ const Loginuserdetails = () => {
           }}
           scrollEventThrottle={16}
         >
-          {profileSlice.images.map((img, index) => (
+          {images.map((img: string, index: number) => (
             <Image
               key={index}
-              source={{uri:img}}
+              source={{ uri: img }}
               style={styles.image}
               resizeMode="cover"
             />
@@ -77,17 +99,19 @@ const Loginuserdetails = () => {
         </ScrollView>
 
         {/* DOTS INDICATOR */}
-        <View style={styles.dotsContainer}>
-          {user.images.map((_, index) => (
-            <View
-              key={index}
-              style={[
-                styles.dot,
-                activeIndex === index && styles.activeDot,
-              ]}
-            />
-          ))}
-        </View>
+        {images.length > 1 && (
+          <View style={styles.dotsContainer}>
+            {images.map((_: string, index: number) => (
+              <View
+                key={index}
+                style={[
+                  styles.dot,
+                  activeIndex === index && styles.activeDot,
+                ]}
+              />
+            ))}
+          </View>
+        )}
 
         {/* BACK BUTTON */}
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
@@ -97,28 +121,22 @@ const Loginuserdetails = () => {
 
       {/* INFO CARD */}
       <View style={styles.infoContainer}>
-        {/* NAME + EDIT */}
         <View style={styles.topRow}>
           <View>
-            <Text style={styles.name}>{profileSlice.full_name}</Text>
-            <Text style={styles.profession}>{profileSlice.profession}</Text>
+            <Text style={styles.name}>{profile.full_name}</Text>
+            <Text style={styles.profession}>{profile.profession || ''}</Text>
           </View>
-
-         
         </View>
 
-        {/* ABOUT */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>About</Text>
-          <Text style={styles.sectionContent}>{profileSlice.about}</Text>
+          <Text style={styles.sectionContent}>{profile.about || ''}</Text>
         </View>
 
-        {/* INTERESTS */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Interests</Text>
-
           <View style={styles.interestsContainer}>
-            {profileSlice?.interests?.length > 0 && profileSlice.interests.map((interest, index) => (
+            {profile?.interests?.length > 0 && profile.interests.map((interest: string, index: number) => (
               <View key={index} style={styles.interestBadge}>
                 <Text style={styles.interestText}>{interest}</Text>
               </View>
@@ -247,5 +265,15 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontFamily: Fonts.medium,
+  },
+
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 16,
+    color: Colors.black,
+    fontFamily: Fonts.regular,
   },
 });

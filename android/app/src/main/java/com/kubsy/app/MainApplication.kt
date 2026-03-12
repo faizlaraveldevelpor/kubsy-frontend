@@ -1,4 +1,4 @@
-package com.kubsy.datting
+package com.kubsy.app
 
 import android.app.Application
 import android.content.res.Configuration

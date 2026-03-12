@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaTop } from '@/hooks/useSafeAreaTop';
@@ -16,7 +18,7 @@ import { Fonts } from '@/theme/fonts';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useSelector } from 'react-redux';
-import { logoutAndClearToken } from '@/hooks/usePushNotifications';
+import { logoutAndClearToken, getPushPermissionStatus, requestPushPermissionAndSave } from '@/hooks/usePushNotifications';
 
 const { width } = Dimensions.get('window');
 
@@ -40,6 +42,35 @@ export default function ProfileScreen() {
   const safeTop = useSafeAreaTop();
   const profileSlice = useSelector((state: any) => state?.profileSlice?.userApi);
   const isPremium = profileSlice?.is_vip === true;
+  const [notificationStatus, setNotificationStatus] = useState<'granted' | 'denied' | 'undetermined' | null>(null);
+  const [notificationLoading, setNotificationLoading] = useState(false);
+
+  const refreshNotificationStatus = async () => {
+    const status = await getPushPermissionStatus();
+    setNotificationStatus(status);
+  };
+
+  useEffect(() => {
+    refreshNotificationStatus();
+  }, []);
+
+  const handleEnableNotifications = async () => {
+    const userId = profileSlice?.id;
+    if (!userId) return;
+    setNotificationLoading(true);
+    try {
+      const result = await requestPushPermissionAndSave(userId);
+      await refreshNotificationStatus();
+      if (!result.granted) {
+        Alert.alert(
+          'Notifications',
+          'Permission was denied or not available. You can enable it later in your device Settings → Apps → Kubsy → Notifications.'
+        );
+      }
+    } finally {
+      setNotificationLoading(false);
+    }
+  };
 
   const handleLogout = async () => {
     const { data } = await supabase.auth.getUser();
@@ -159,6 +190,29 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Account</Text>
           <View style={styles.menuCard}>
+            {/* Notifications – manual permission trigger */}
+            <TouchableOpacity
+              style={[styles.menuRow, styles.menuRowBorder]}
+              onPress={notificationStatus === 'granted' ? undefined : handleEnableNotifications}
+              activeOpacity={0.7}
+              disabled={notificationStatus === 'granted' || notificationLoading}
+            >
+              <View style={styles.menuLeft}>
+                <View style={[styles.menuIcon, { backgroundColor: ICON_BG }]}>
+                  <Ionicons name="notifications-outline" size={20} color={ICON_COLOR} />
+                </View>
+                <Text style={styles.menuText}>
+                  {notificationStatus === 'granted' ? 'Notifications: On' : 'Enable notifications'}
+                </Text>
+              </View>
+              {notificationLoading ? (
+                <ActivityIndicator size="small" color={Colors.primary} />
+              ) : notificationStatus === 'granted' ? (
+                <Ionicons name="checkmark-circle" size={22} color={Colors.primary} />
+              ) : (
+                <Entypo name="chevron-right" size={20} color={Colors.lightPink + '80'} />
+              )}
+            </TouchableOpacity>
             {MENU_ITEMS.account.map((item, i) => (
               <TouchableOpacity
                 key={item.label}

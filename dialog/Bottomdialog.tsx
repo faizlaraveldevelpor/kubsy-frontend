@@ -22,11 +22,20 @@ import { agefilter, intrestsfilter, distancefilterfnc, genderfilterfnc } from '@
 const { height, width } = Dimensions.get('window');
 const SLIDER_LENGTH = width - 80;
 
+// Wahi interests jo Intrestes.tsx (signup) mein hain – filter ke liye
 const INTERESTS = [
-  { label: 'Sports', icon: 'football-outline' },
   { label: 'Music', icon: 'musical-notes-outline' },
+  { label: 'Sports', icon: 'football-outline' },
   { label: 'Travel', icon: 'airplane-outline' },
   { label: 'Food', icon: 'restaurant-outline' },
+  { label: 'Movies', icon: 'film-outline' },
+  { label: 'Fitness', icon: 'barbell-outline' },
+  { label: 'Books', icon: 'book-outline' },
+  { label: 'Photography', icon: 'camera-outline' },
+  { label: 'Gaming', icon: 'game-controller-outline' },
+  { label: 'Art', icon: 'color-palette-outline' },
+  { label: 'Technology', icon: 'laptop-outline' },
+  { label: 'Fashion', icon: 'shirt-outline' },
 ];
 
 export default function BottomFilterDialog({ visible, onClose }: { visible: boolean; onClose: () => void }) {
@@ -45,17 +54,17 @@ export default function BottomFilterDialog({ visible, onClose }: { visible: bool
 
   useEffect(() => {
     if (visible) {
-      setSelectedInterests(reduxInterests?.length > 0 ? reduxInterests : []);
-      setAgeRange(reduxAge?.length > 0 ? reduxAge : [18, 40]);
-      setDistanceRange(reduxDistance?.length > 0 ? reduxDistance : [5, 50]);
-      setGender(reduxGender || '');
+      setSelectedInterests(Array.isArray(reduxInterests) && reduxInterests.length > 0 ? reduxInterests : []);
+      setAgeRange(Array.isArray(reduxAge) && reduxAge.length >= 2 ? reduxAge : [18, 40]);
+      setDistanceRange(Array.isArray(reduxDistance) && reduxDistance.length >= 2 ? reduxDistance : [5, 50]);
+      setGender(reduxGender && String(reduxGender).trim() ? String(reduxGender) : '');
       Animated.timing(translateY, {
         toValue: 0,
         duration: 300,
         useNativeDriver: true,
       }).start();
     }
-  }, [visible, reduxInterests, reduxAge]);
+  }, [visible, reduxInterests, reduxAge, reduxDistance, reduxGender]);
 
   const closeModal = () => {
     Animated.timing(translateY, {

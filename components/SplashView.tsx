@@ -15,6 +15,7 @@ import { Colors } from '@/theme/color';
 import { Fonts } from '@/theme/fonts';
 
 const { width, height } = Dimensions.get('window');
+const isShortScreen = height < 640;
 
 export default function SplashView() {
   return (
@@ -29,34 +30,48 @@ export default function SplashView() {
         locations={[0, 0.35, 0.65, 1]}
         style={styles.overlay}
       >
-        <View style={styles.content}>
+        <View style={styles.content} collapsable={false}>
           <Image
             source={require('@/assets/images/logo.png')}
-            style={styles.logo}
+            style={[styles.logo, isShortScreen && styles.logoSmall]}
             resizeMode="contain"
           />
-          <Text style={styles.appName}>Kubsy</Text>
-          <Text style={styles.tagline}>Meet, Match, Kubsy</Text>
+          <View style={styles.appNameWrap}>
+            <Text style={styles.appName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
+              Kubsy
+            </Text>
+          </View>
+          <View style={styles.taglineWrap}>
+            <Text
+              style={[styles.tagline, isShortScreen && styles.taglineSmall]}
+              numberOfLines={2}
+              allowFontScaling
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
+              Meet, Match, Kubsy
+            </Text>
+          </View>
 
-          <View style={styles.pills}>
+          <View style={[styles.pills, isShortScreen && styles.pillsSmall]}>
             <View style={styles.pill}>
               <AntDesign name="heart" size={14} color={Colors.lightPink} />
-              <Text style={styles.pillText}>Real connections</Text>
+              <Text style={styles.pillText} numberOfLines={1}>Real connections</Text>
             </View>
             <View style={styles.pill}>
               <MaterialCommunityIcons name="hand-heart" size={14} color={Colors.lightPink} />
-              <Text style={styles.pillText}>Swipe & match</Text>
+              <Text style={styles.pillText} numberOfLines={1}>Swipe & match</Text>
             </View>
             <View style={styles.pill}>
               <Ionicons name="shield-checkmark" size={14} color={Colors.lightPink} />
-              <Text style={styles.pillText}>Safe & private</Text>
+              <Text style={styles.pillText} numberOfLines={1}>Safe & private</Text>
             </View>
           </View>
         </View>
 
-        <View style={styles.bottom}>
+        <View style={styles.bottom} collapsable={false}>
           <ActivityIndicator size="small" color={Colors.primary} style={{ marginBottom: 14 }} />
-          <Text style={styles.loadingText}>Finding your perfect match…</Text>
+          <Text style={styles.loadingText} numberOfLines={1}>Finding your perfect match…</Text>
         </View>
       </LinearGradient>
     </ImageBackground>
@@ -76,30 +91,54 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
+    overflow: 'visible',
   },
   content: {
     flex: 1,
+    flexShrink: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: 24,
+    overflow: 'visible',
+    minHeight: 200,
   },
   logo: {
     width: 100,
     height: 100,
     marginBottom: 18,
   },
+  logoSmall: {
+    width: 72,
+    height: 72,
+    marginBottom: 12,
+  },
+  appNameWrap: {
+    width: '100%',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
   appName: {
-    fontSize: 48,
+    fontSize: 42,
     fontFamily: Fonts.bold,
     color: Colors.white,
-    letterSpacing: 1,
+    letterSpacing: 0.5,
+  },
+  taglineWrap: {
+    width: '100%',
+    paddingHorizontal: 20,
+    marginTop: 6,
+    alignItems: 'center',
+    minHeight: 44,
   },
   tagline: {
-    fontSize: 17,
+    fontSize: 16,
     fontFamily: Fonts.medium,
     color: Colors.softPink,
-    marginTop: 6,
     letterSpacing: 0.3,
+    textAlign: 'center',
+  },
+  taglineSmall: {
+    fontSize: 14,
   },
   pills: {
     flexDirection: 'row',
@@ -107,6 +146,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     marginTop: 32,
+  },
+  pillsSmall: {
+    marginTop: 18,
+    gap: 8,
   },
   pill: {
     flexDirection: 'row',
@@ -125,6 +168,7 @@ const styles = StyleSheet.create({
   bottom: {
     alignItems: 'center',
     paddingBottom: 60,
+    flexShrink: 0,
   },
   loadingText: {
     fontSize: 13,

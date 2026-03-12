@@ -8,6 +8,17 @@ export async function getMyProfile() {
   const user = await getCurrentUser();
   return supabase.from('profiles').select('*').eq('id', user?.id).single();
 }
+
+/** Kisi bhi user ki profile ID se fetch karo (e.g. userdetail page ke liye) */
+export async function getProfileById(profileId: string) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', profileId)
+    .single();
+  if (error) throw error;
+  return data;
+}
 export async function insertProfile(data: ProfileData) {
   const user = await getCurrentUser();
 

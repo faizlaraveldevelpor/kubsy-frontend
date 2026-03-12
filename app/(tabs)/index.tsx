@@ -16,6 +16,17 @@ import { allprofilesFnc, GetprofileApi, cetagory, setProfilesMetadata } from '@/
 import { createaction } from '@/services/Like';
 import { Fonts } from '@/theme/fonts';
 
+function getAge(dob: string | number | null | undefined): number | 'N/A' {
+  if (dob == null) return 'N/A';
+  const date = typeof dob === 'number' ? new Date(dob) : new Date(dob);
+  if (isNaN(date.getTime())) return 'N/A';
+  const today = new Date();
+  let age = today.getFullYear() - date.getFullYear();
+  const m = today.getMonth() - date.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < date.getDate())) age--;
+  return age < 0 ? 'N/A' : age;
+}
+
 export default function HomeScreen() {
   const dispatch = useDispatch();
   const router = useRouter();
@@ -61,7 +72,7 @@ export default function HomeScreen() {
           minAge: filterage?.length > 0 ? filterage[0] : 18,
           maxAge: filterage?.length > 0 ? filterage[1] : 40,
           maxDistance: filterdistance?.length > 0 ? filterdistance[1] : 100,
-          genderFilter:profileSlice.gender ?? undefined,
+          genderFilter: genderfilter && genderfilter.trim() !== '' ? genderfilter : undefined,
           professionFilter: [], // Home pe sab professions dikhane ke liye
           userInterests: Array.isArray(interests) ? interests : [],
           // Pehle Redux cetagory (Settings se update), phir userApi – taake kisi page se Home aane par bhi updated category jaye
@@ -81,13 +92,20 @@ export default function HomeScreen() {
       }
 
       if (res && Array.isArray(res.data)) {
-        const newData = res.data.map((u: any) => ({
-          id: u.id,
-          full_name: u.full_name || 'Unknown',
-          profession: u.profession || 'N/A',
-          distance_km: u.distance_km ? `${u.distance_km} km away` : '0 km away',
-          avatar_url: u.avatar_url || 'https://placehold.co/400x400',
-        }));
+        const newData = res.data.map((u: any) => {
+          const dob = u.date_of_birth ?? u.dateOfBirth ?? null;
+          const dobVal = (dob === '' || dob === undefined) ? null : dob;
+          const age = typeof u.age === 'number' ? u.age : getAge(dobVal);
+          return {
+            id: u.id,
+            full_name: u.full_name || 'Unknown',
+            profession: u.profession || 'N/A',
+            age,
+            date_of_birth: dobVal,
+            distance_km: u.distance_km ? `${u.distance_km} km away` : '0 km away',
+            avatar_url: u.avatar_url || 'https://placehold.co/400x400',
+          };
+        });
 
         const updatedList = isNewFilter ? newData : [...allprofileSliceRef.current, ...newData];
         dispatch(allprofilesFnc(updatedList));
@@ -99,9 +117,14 @@ export default function HomeScreen() {
           try {
             const myProfileRes = await getMyProfile();
             if (myProfileRes?.data) {
-              dispatch(GetprofileApi(myProfileRes.data));
-              const cat = myProfileRes.data.cetagory ?? myProfileRes.data.category;
-              if (cat != null && cat !== '') dispatch(cetagory(cat));
+              if (profileSlice?.is_vip === true && myProfileRes.data?.is_vip !== true) {
+                const cat = myProfileRes.data.cetagory ?? myProfileRes.data.category;
+                if (cat != null && cat !== '') dispatch(cetagory(cat));
+              } else {
+                dispatch(GetprofileApi(myProfileRes.data));
+                const cat = myProfileRes.data.cetagory ?? myProfileRes.data.category;
+                if (cat != null && cat !== '') dispatch(cetagory(cat));
+              }
             }
           } catch (_) {}
         }
@@ -138,8 +161,8 @@ export default function HomeScreen() {
 
     sendInteraction();
   }, [actionState]); // Jab bhi swipe action hoga, ye trigger hoga
-  // categoryFromRedux use – Settings update ke baad bhi refetch sahi category se ho
-  const filterKey = `${profileSlice?.id ?? ""}|${categoryFromRedux ?? ""}|${(filterage ?? []).join("-")}|${(filterdistance ?? []).join("-")}|${genderfilter ?? ""}|${(filterintrests ?? []).join(",")}`;
+  // categoryFromRedux + profileSlice (e.g. gender) – Settings/Personal Info update ke baad bhi refetch ho
+  const filterKey = `${profileSlice?.id ?? ""}|${categoryFromRedux ?? ""}|${profileSlice?.gender ?? ""}|${(filterage ?? []).join("-")}|${(filterdistance ?? []).join("-")}|${genderfilter ?? ""}|${(filterintrests ?? []).join(",")}`;
 
   useEffect(() => {
     if (profileSlice?.id) {
@@ -150,7 +173,7 @@ export default function HomeScreen() {
     }
   }, [profileSlice?.id, filterKey]);
 
-  // Jab Home tab focus ho: pehle DB se profile + category Redux mein sync karo, taake rerender par updated category use ho
+  // Jab Home tab focus ho: pehle DB se profile + category Redux mein sync karo (lekin agar payment ke baad premium hai to stale fetch se overwrite na karo)
   useFocusEffect(
     useCallback(() => {
       if (!profileSlice?.id) return;
@@ -160,6 +183,11 @@ export default function HomeScreen() {
           const myProfileRes = await getMyProfile();
           if (cancelled) return;
           if (myProfileRes?.data) {
+            if (profileSlice?.is_vip === true && myProfileRes.data?.is_vip !== true) {
+              const cat = myProfileRes.data.cetagory ?? myProfileRes.data.category;
+              if (cat != null && cat !== '') dispatch(cetagory(cat));
+              return;
+            }
             dispatch(GetprofileApi(myProfileRes.data));
             const cat = myProfileRes.data.cetagory ?? myProfileRes.data.category;
             if (cat != null && cat !== '') dispatch(cetagory(cat));
@@ -167,7 +195,7 @@ export default function HomeScreen() {
         } catch (_) {}
       })();
       return () => { cancelled = true; };
-    }, [profileSlice?.id, dispatch])
+    }, [profileSlice?.id, profileSlice?.is_vip, dispatch])
   );
 
   const handleLoadMore = () => {

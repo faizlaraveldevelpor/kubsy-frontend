@@ -32,6 +32,9 @@ export default function Verifynumber() {
   const inputRefs = useRef<TextInput[]>([]);
 
   const displayPhone = typeof phone === 'string' ? phone : loginuserInfo?.number || '';
+  /** Same number we sent OTP to (from params or store). Must include + and country code. */
+  const phoneForVerify =
+    (typeof phone === 'string' ? phone : loginuserInfo?.number)?.trim() || '';
 
   const handleOtpChange = (value: string, index: number) => {
     const newOtp = [...otp];
@@ -55,13 +58,15 @@ export default function Verifynumber() {
       return;
     }
 
+    if (!phoneForVerify || !phoneForVerify.startsWith('+')) {
+      Alert.alert('Error', 'Phone number missing. Please go back and enter your number.');
+      return;
+    }
+
     setLoading(true);
     try {
       const { data, error: authError } = await supabase.auth.verifyOtp({
-        phone:
-          typeof phone === 'string' && phone.startsWith('+')
-            ? phone
-            : `+92${loginuserInfo?.number}`,
+        phone: phoneForVerify,
         token: fullOtp,
         type: 'sms',
       });

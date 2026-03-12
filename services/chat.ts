@@ -69,7 +69,7 @@ export const getCnversation = async (profileId: string, page: number = 0, pageSi
 
     if (error) throw error;
 
-    return data.map((conv: any) => ({
+    return (data || []).map((conv: any) => ({
       conversation_id: conv.id,
       updated_at: conv.updated_at,
       last_message: conv.last_message,
@@ -208,7 +208,7 @@ export const createMessage = async ({ conversation_id, sender_id, content, messa
         to: pushToken,
         title: senderName,
         body: notifBody || "New message",
-        data: { type: "chat", matchId: conversation_id },
+        data: { type: "chat", matchId: String(conversation_id) },
         sound: "default",
         priority: "high" as const,
         channelId: "default",

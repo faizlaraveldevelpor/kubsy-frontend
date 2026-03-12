@@ -1,4 +1,4 @@
-package com.kubsy.datting
+package com.kubsy.app
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

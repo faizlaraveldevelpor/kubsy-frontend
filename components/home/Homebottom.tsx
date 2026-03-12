@@ -20,6 +20,54 @@ const { width, height } = Dimensions.get('window');
 const SWIPE_X_THRESHOLD = width * 0.3;
 const SWIPE_Y_THRESHOLD = height * 0.25;
 
+function getDisplayAge(user: {
+  age?: number | 'N/A';
+  date_of_birth?: string | number | null;
+  dateOfBirth?: string | number | null;
+}): number | null {
+  if (user?.age != null && user.age !== 'N/A' && typeof user.age === 'number') return user.age;
+  const dob = user?.date_of_birth ?? (user as any)?.dateOfBirth ?? null;
+  if (dob == null || dob === '') return null;
+  // Support "YYYY-MM-DD" string (API sends date_of_birth in this format)
+  let d: Date;
+  if (typeof dob === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dob)) {
+    const [y, m, day] = dob.split('-').map(Number);
+    d = new Date(y, m - 1, day);
+  } else {
+    d = new Date(typeof dob === 'number' ? dob : dob);
+  }
+  if (isNaN(d.getTime())) return null;
+  const today = new Date();
+  let a = today.getFullYear() - d.getFullYear();
+  const mo = today.getMonth() - d.getMonth();
+  if (mo < 0 || (mo === 0 && today.getDate() < d.getDate())) a--;
+  return a < 0 ? null : a;
+}
+
+/** Card pe "Name, 29" ke liye ", 29" ya "" return karta hai. Pehle user.age (mapped), phir date_of_birth se compute. */
+function getAgeSuffix(user: any): string {
+  if (!user) return '';
+  // 1) Redux mapped object se age (number)
+  if (typeof user.age === 'number' && user.age >= 0) return `, ${user.age}`;
+  // 2) date_of_birth se calculate (API format "YYYY-MM-DD")
+  const dob = user.date_of_birth ?? user.dateOfBirth ?? null;
+  if (dob == null || dob === '') return '';
+  let d: Date;
+  if (typeof dob === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dob)) {
+    const [y, m, day] = dob.split('-').map(Number);
+    d = new Date(y, m - 1, day);
+  } else {
+    d = new Date(typeof dob === 'number' ? dob : dob);
+  }
+  if (isNaN(d.getTime())) return '';
+  const today = new Date();
+  let a = today.getFullYear() - d.getFullYear();
+  const mo = today.getMonth() - d.getMonth();
+  if (mo < 0 || (mo === 0 && today.getDate() < d.getDate())) a--;
+  if (a < 0) return '';
+  return `, ${a}`;
+}
+
 interface HomebottomProps {
   allusers: any[];
   profileSlice: { id: number };
@@ -209,12 +257,15 @@ const Homebottom: React.FC<HomebottomProps> = ({
             <View style={styles.cardInfo}>
               <View style={styles.cardInfoTop}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.cardName}>{currentUser.full_name}</Text>
+                  <Text style={styles.cardName}>
+                    {currentUser.full_name}
+                    {getAgeSuffix(currentUser)}
+                  </Text>
                   <Text style={styles.cardProfession}>{currentUser.profession}</Text>
                 </View>
                 <TouchableOpacity
                   style={styles.detailBtn}
-                  onPress={() => router.push('userdetail')}
+                  onPress={() => router.push({ pathname: '/userdetail', params: { id: String(currentUser.id) } })}
                   activeOpacity={0.8}
                 >
                   <Ionicons name="information-circle-outline" size={24} color="#fff" />

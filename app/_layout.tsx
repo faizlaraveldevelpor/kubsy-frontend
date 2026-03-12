@@ -26,6 +26,8 @@ import SplashView from '@/components/SplashView';
 
 import { Roboto_700Bold,Roboto_400Regular,Roboto_500Medium,Roboto_600SemiBold, } from '@expo-google-fonts/roboto';
 import { supabase } from '@/lib/supabase';
+import { setSessionFromUrl } from '@/services/Auth';
+import * as Linking from 'expo-linking';
 import { useEffect, useRef, useState } from 'react';
 import { useLocationOnStart } from '@/hooks/Location';
 import { store } from '@/store/Store';
@@ -34,6 +36,7 @@ import { getPaymentConfigFromApi } from '@/lib/paymentConfig';
 import { getMyProfile } from '@/services/Profile';
 import { GetprofileApi } from '@/store/profileSlice';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useDailyQuoteNotification } from '@/hooks/useDailyQuoteNotification';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -48,17 +51,25 @@ export default function RootLayout() {
   const initialRoute = useRef<string | null>(null);
   const hasNavigated = useRef(false);
   usePushNotifications(userId);
+  useDailyQuoteNotification();
 
   const [loaded] = useFonts({
     Roboto_700Bold, Roboto_400Regular, Roboto_500Medium, Roboto_600SemiBold,
   });
 
-  // Auth check — stores destination without navigating
+  // Auth check — stores destination without navigating (deep link se bhi session set ho to yahi use hota hai)
   useEffect(() => {
     let isMounted = true;
 
     (async () => {
       try {
+        // Deep link: jab app kubsy://auth-callback se open ho (Google login ke baad), pehle session set karo
+        const initialUrl = await Linking.getInitialURL();
+        if (initialUrl && initialUrl.includes('auth-callback')) {
+          const result = await setSessionFromUrl(initialUrl);
+          if (!result.ok && __DEV__) console.warn('[Auth] setSessionFromUrl:', result.error);
+        }
+
         const { data } = await supabase.auth.getUser();
         if (!isMounted) return;
 
@@ -92,6 +103,22 @@ export default function RootLayout() {
     })();
 
     return () => { isMounted = false; };
+  }, []);
+
+  // Jab app already open ho aur browser se kubsy://auth-callback redirect aaye (e.g. background se wapas aane par)
+  useEffect(() => {
+    const sub = Linking.addEventListener('url', async (event) => {
+      if (!event?.url || !event.url.includes('auth-callback')) return;
+      const result = await setSessionFromUrl(event.url);
+      if (!result.ok) return;
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) {
+        const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', data.user.id).maybeSingle();
+        if (!profile?.full_name) router.replace('/signupsteps/Fillyourprofile');
+        else router.replace('/(tabs)');
+      }
+    });
+    return () => sub.remove();
   }, []);
 
   // Splash timer — minimum 3 seconds, then hide once auth is also done
@@ -183,6 +210,8 @@ export default function RootLayout() {
 
 
           
+          <Stack.Screen name="[...unmatched]" options={{ headerShown: false }} />
+          <Stack.Screen name="auth-callback" options={{ headerShown: false }} />
           <Stack.Screen name="startScreen" options={{ headerShown: false }} />
         {/* <Stack.Screen name="Selectlocation" options={{ headerShown: false }} /> */}
         <Stack.Screen name="Signinpassword" options={{ headerShown: false }} />

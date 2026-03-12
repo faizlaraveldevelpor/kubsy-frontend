@@ -10,13 +10,17 @@ import { clearPushToken, savePushToken } from '@/services/pushToken';
 let _isLoggedIn = false;
 
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: _isLoggedIn,
-    shouldPlaySound: _isLoggedIn,
-    shouldSetBadge: _isLoggedIn,
-    shouldShowBanner: _isLoggedIn,
-    shouldShowList: _isLoggedIn,
-  }),
+  handleNotification: async (notification) => {
+    const isQuoteOfTheDay = notification.request.content.data?.type === "quote";
+    const show = isQuoteOfTheDay || _isLoggedIn;
+    return {
+      shouldShowAlert: show,
+      shouldPlaySound: show,
+      shouldSetBadge: _isLoggedIn,
+      shouldShowBanner: show,
+      shouldShowList: show,
+    };
+  },
 });
 
 export function usePushNotifications(userId: string | null) {
@@ -29,19 +33,53 @@ export function usePushNotifications(userId: string | null) {
   useEffect(() => {
     if (!userId) {
       _isLoggedIn = false;
+      if (__DEV__) console.log('[Push] Step 0: userId nahi hai – login/profile complete karo');
       return;
     }
 
     _isLoggedIn = true;
+    let cancelled = false;
+    if (__DEV__) console.log('[Push] Step 0: userId set, 1.2s baad permission + token start');
 
-    registerForPushNotificationsAsync().then(async (token) => {
-      if (token) {
-        setExpoPushToken(token);
-        await savePushToken(userId, token);
-        // Test ke liye: Expo Push Tool (expo.dev/notifications) mein ye token paste karein
-        if (__DEV__) console.log('[Push] Expo token:', token);
-      }
-    });
+    // Thodi der baad permission maango taake main screen dikh raha ho (production build ko zyada time do)
+    const delayMs = __DEV__ ? 1200 : 2500;
+    const t = setTimeout(() => {
+      const tryRegister = (isRetry?: boolean) => {
+        registerForPushNotificationsAsync().then(async (token) => {
+          if (cancelled) return;
+          if (!token) {
+            if (__DEV__) console.log('[Push] Step 1 FAIL: token nahi mila (permission/emulator/projectId check karo)');
+            // Production: ek baar 3s baad retry – native kabhi late ready hota hai
+            if (!__DEV__ && !isRetry) {
+              setTimeout(() => tryRegister(true), 3000);
+            }
+            return;
+          }
+          if (__DEV__) console.log('[Push] Step 1 OK: token mila, ab DB mein save try');
+          setExpoPushToken(token);
+          let result = await savePushToken(userId, token);
+          if (cancelled) return;
+          if (!result?.ok) {
+            if (__DEV__) console.log('[Push] Step 2: pehli save fail, 2s baad retry');
+            await new Promise((r) => setTimeout(r, 2000));
+            result = await savePushToken(userId, token);
+          }
+          if (!cancelled && __DEV__) {
+            console.log('[Push] Step 2:', result?.ok ? 'Token DB mein SAVED' : 'Token save FAIL – ' + (result?.error || 'unknown'));
+          }
+        });
+      };
+      tryRegister(false);
+    }, delayMs);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
 
     // Foreground mein notification aaye to
     notificationListener.current = Notifications.addNotificationReceivedListener((notif) => {
@@ -77,8 +115,24 @@ export async function logoutAndClearToken(userId: string) {
   await clearPushToken(userId);
 }
 
+/** Manually request push permission (e.g. "Enable notifications" button) – returns token if granted */
+export async function requestPushPermissionAndSave(userId: string | null): Promise<{ granted: boolean; token?: string }> {
+  if (!userId) return { granted: false };
+  const token = await registerForPushNotificationsAsync();
+  if (!token) return { granted: false };
+  await savePushToken(userId, token);
+  return { granted: true, token };
+}
+
+/** Check if push permission is granted (without requesting) */
+export async function getPushPermissionStatus(): Promise<'granted' | 'denied' | 'undetermined'> {
+  const { status } = await Notifications.getPermissionsAsync();
+  return status;
+}
+
 async function registerForPushNotificationsAsync(): Promise<string | null> {
   if (!Device.isDevice) {
+    if (__DEV__) console.warn('[Push] Token nahi: Device.isDevice false – real device pe chalao, emulator pe nahi');
     return null;
   }
 
@@ -95,21 +149,31 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
   let finalStatus = existingStatus;
 
   if (existingStatus !== 'granted') {
+    if (__DEV__) console.log('[Push] Permission nahi thi, request kar rahe hain...');
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
   }
 
   if (finalStatus !== 'granted') {
-    console.warn('Push notification permission nahi mili');
+    if (__DEV__) console.warn('[Push] Token nahi: permission denied – Profile → Enable notifications try karo');
     return null;
   }
 
-  const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+  // Production build mein kabhi kabhi expoConfig.extra.eas alag hota hai – multiple fallbacks
+  const projectId =
+    Constants.expoConfig?.extra?.eas?.projectId ??
+    (Constants.expoConfig as any)?.projectId ??
+    (Constants as any).projectId;
   if (!projectId) {
-    console.error('EAS projectId app.json mein nahi mila');
+    if (__DEV__) console.error('[Push] Token nahi: app.json → extra.eas.projectId (ya projectId) missing');
     return null;
   }
 
-  const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
-  return tokenData.data;
+  try {
+    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+    return tokenData?.data ?? null;
+  } catch (e: any) {
+    if (__DEV__) console.warn('[Push] getExpoPushTokenAsync error:', e?.message ?? e);
+    return null;
+  }
 }

@@ -14,23 +14,92 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, AntDesign, MaterialCommunityIcons } from '@expo/vector-icons';
+import CountryPicker, { Country, CountryCode } from 'react-native-country-picker-modal';
 import { useSafeAreaTop } from '@/hooks/useSafeAreaTop';
 import { Colors } from '@/theme/color';
-import { useRouter } from 'expo-router';
+import { router } from 'expo-router';
 import { Fonts } from '@/theme/fonts';
 import { supabase } from '@/lib/supabase';
 import { userlogininfo } from '@/store/profileSlice';
 import { useDispatch } from 'react-redux';
+import { signInWithOAuthProvider } from '@/services/Auth';
+// OAuth uses makeRedirectUri(scheme: 'kubsy', path: 'auth-callback') in Auth.ts; redirect handled there.
 
 const { width, height: SCREEN_H } = Dimensions.get('window');
 
+const DEFAULT_COUNTRY_CODE: CountryCode = 'SL';
+const DEFAULT_CALLING_CODE = '+232';
+
+/** Country code (e.g. "US") to flag emoji */
+function getFlagEmoji(cca2: string): string {
+  if (!cca2 || cca2.length !== 2) return '🌐';
+  return cca2
+    .toUpperCase()
+    .split('')
+    .map((char) => String.fromCodePoint(0x1f1e6 - 65 + char.charCodeAt(0)))
+    .join('');
+}
+
 export default function StartScreen() {
-  const router = useRouter();
   const safeTop = useSafeAreaTop();
+  const [countryCode, setCountryCode] = useState<CountryCode>(DEFAULT_COUNTRY_CODE);
+  const [callingCode, setCallingCode] = useState(DEFAULT_CALLING_CODE);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const dispatch = useDispatch();
+
+  const handleGoogleLogin = async () => {
+    setOauthLoading('google');
+    try {
+      const { error } = await signInWithOAuthProvider('google');
+      if (error) {
+        if (error) alert(error);
+        return;
+      }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
+      if (!profile?.full_name) {
+        router.replace('/signupsteps/Fillyourprofile');
+      } else {
+        router.replace('/(tabs)');
+      }
+    } catch (e: any) {
+      alert(e?.message ?? 'Google sign in failed');
+    } finally {
+      setOauthLoading(null);
+    }
+  };
+
+  const handleAppleLogin = async () => {
+    setOauthLoading('apple');
+    try {
+      const { error } = await signInWithOAuthProvider('apple');
+      if (error) {
+        alert(error);
+        return;
+      }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle();
+      if (!profile?.full_name) {
+        router.replace('/signupsteps/Fillyourprofile');
+      } else {
+        router.replace('/(tabs)');
+      }
+    } catch (e: any) {
+      alert(e?.message ?? 'Apple sign in failed');
+    } finally {
+      setOauthLoading(null);
+    }
+  };
+
+  const onSelectCountry = (country: Country) => {
+    setCountryCode(country.cca2);
+    setCallingCode('+' + (country.callingCode?.[0] ?? ''));
+  };
 
   useEffect(() => {
     const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
@@ -50,15 +119,15 @@ export default function StartScreen() {
       return;
     }
 
-    if (phoneNumber.length < 10) {
+    const digitsOnly = phoneNumber.replace(/\D/g, '');
+    if (digitsOnly.length < 8) {
       alert("Please enter a valid phone number");
       return;
     }
 
     setLoading(true);
     try {
-      const cleaned = phoneNumber.replace(/^0+/, '');
-      const formattedPhone = cleaned.startsWith('+') ? cleaned : `+92${cleaned}`;
+      const formattedPhone = (callingCode.startsWith('+') ? callingCode : '+' + callingCode) + digitsOnly;
       console.log(formattedPhone);
       
       // 1. Number se Profile search karke Auth ID nikalna
@@ -167,20 +236,68 @@ export default function StartScreen() {
 
       {/* Form */}
       <View style={styles.formCard}>
-        <Text style={styles.welcomeText}>Welcome back</Text>
-        <Text style={styles.formSubtext}>Enter your number to continue</Text>
+        <Text style={styles.welcomeText}>Get your perfect match</Text>
+        <Text style={styles.formSubtext}>Enter your number or sign in with</Text>
 
+        <View style={styles.socialRow}>
+          <TouchableOpacity
+            style={[styles.socialButton, oauthLoading && { opacity: 0.7 }]}
+            onPress={handleGoogleLogin}
+            disabled={!!oauthLoading}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="logo-google" size={22} color={Colors.white} />
+            <Text style={styles.socialButtonText}>Google</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.socialButton, oauthLoading && { opacity: 0.7 }]}
+            onPress={handleAppleLogin}
+            disabled={!!oauthLoading}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="logo-apple" size={24} color={Colors.white} />
+            <Text style={styles.socialButtonText}>Apple</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.orDivider}>— or enter your number —</Text>
+
+        <Text style={styles.phoneLabel}>Phone number</Text>
         <View style={styles.inputContainer}>
-          <Ionicons name="call-outline" size={22} color={Colors.softPink} style={styles.inputIcon} />
-          <TextInput
-            style={styles.input}
-            placeholder="Phone number (e.g. 3034164509)"
-            placeholderTextColor={Colors.gray}
-            keyboardType="phone-pad"
-            value={phoneNumber}
-            onChangeText={setPhoneNumber}
-            maxLength={11}
-          />
+          <View style={styles.pickerWrapper} pointerEvents="box-none">
+            <CountryPicker
+              countryCode={countryCode}
+              withFilter
+              withCallingCode
+              withEmoji
+              withModal
+              onSelect={onSelectCountry}
+              theme={{ primaryColor: Colors.primary, onBackgroundTextColor: Colors.white, backgroundColor: Colors.darkPlum }}
+              containerButtonStyle={styles.pickerButton}
+              renderFlagButton={({ onOpen }) => (
+                <TouchableOpacity onPress={onOpen} style={styles.pickerTrigger} activeOpacity={0.7}>
+                  <Text style={styles.flagEmoji}>{getFlagEmoji(countryCode)}</Text>
+                  <Text style={styles.prefixText}>{callingCode}</Text>
+                  <Ionicons name="chevron-down" size={20} color={Colors.softPink} style={styles.chevron} />
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+          <View style={styles.inputDivider} />
+          <View style={styles.phoneInputWrapper}>
+            <Ionicons name="call-outline" size={20} color={Colors.softPink} style={styles.inputIcon} />
+            <TextInput
+              style={styles.inputWithPrefix}
+              placeholder="Enter phone number"
+              placeholderTextColor={Colors.gray}
+              keyboardType="phone-pad"
+              value={phoneNumber}
+              onChangeText={(t) => setPhoneNumber(t.replace(/\D/g, ''))}
+              maxLength={15}
+              showSoftInputOnFocus={true}
+              editable
+            />
+          </View>
         </View>
 
         <TouchableOpacity 
@@ -293,6 +410,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     textAlign: 'center',
     opacity: 0.95,
+    paddingBottom:9
   },
   formCard: {
     paddingHorizontal: 24,
@@ -309,7 +427,43 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: Fonts.regular,
     color: Colors.gray,
-    marginBottom: 24,
+    marginBottom: 16,
+  },
+  socialRow: {
+    flexDirection: 'row',
+    gap: 14,
+    marginBottom: 20,
+  },
+  socialButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: Colors.darkPlum,
+    borderWidth: 1.5,
+    borderColor: Colors.wine,
+    borderRadius: 16,
+    height: 52,
+  },
+  socialButtonText: {
+    fontSize: 16,
+    fontFamily: Fonts.medium,
+    color: Colors.white,
+  },
+  orDivider: {
+    fontSize: 13,
+    fontFamily: Fonts.regular,
+    color: Colors.gray,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  phoneLabel: {
+    fontSize: 13,
+    fontFamily: Fonts.medium,
+    color: Colors.gray,
+    marginBottom: 8,
+    marginLeft: 4,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -317,13 +471,63 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.darkPlum,
     borderWidth: 1.5,
     borderColor: Colors.wine,
-    borderRadius: 16,
-    paddingHorizontal: 16,
+    borderRadius: 18,
+    paddingHorizontal: 14,
     marginBottom: 20,
-    height: 56,
+    minHeight: 58,
+    overflow: 'hidden',
+  },
+  pickerWrapper: {
+    flexShrink: 0,
+  },
+  pickerButton: {
+    marginRight: 0,
+  },
+  pickerTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingRight: 12,
+    paddingLeft: 4,
+    minWidth: 100,
+  },
+  flagEmoji: {
+    fontSize: 24,
+    marginRight: 8,
+  },
+  chevron: {
+    marginLeft: 6,
+    opacity: 0.9,
+  },
+  prefixText: {
+    fontSize: 16,
+    color: Colors.white,
+    fontFamily: Fonts.semiBold,
+  },
+  inputDivider: {
+    width: 1.5,
+    height: 28,
+    backgroundColor: Colors.wine,
+    marginRight: 12,
+    marginLeft: 4,
+    borderRadius: 1,
+  },
+  phoneInputWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 0,
   },
   inputIcon: {
-    marginRight: 12,
+    marginRight: 10,
+  },
+  inputWithPrefix: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 16,
+    color: Colors.white,
+    fontFamily: Fonts.regular,
+    paddingVertical: 14,
   },
   input: {
     flex: 1,

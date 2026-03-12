@@ -19,6 +19,7 @@ const { width, height: SCREEN_H } = Dimensions.get("window");
 const CATEGORIES = [
   { label: "Casual dating", icon: "coffee-outline", desc: "Keep it light & fun" },
   { label: "Hookups", icon: "fire", desc: "No strings attached" },
+  { label: "Serious relation", icon: "heart", desc: "Looking for something long-term" },
   { label: "Open to anything", icon: "heart-multiple-outline", desc: "Let's see what happens" },
   { label: "Friends first", icon: "account-group-outline", desc: "Build a connection first" },
 ];
